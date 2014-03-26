@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font-family: "Helvetica Neue", Helvetica, sans-serif;
+  margin: 30px auto;
+  width: 1280px;
+  position: relative;
+}
+
+header {
+  padding: 6px 0;
+}
+
+.group {
+  margin-bottom: 1em;
+}
+
+.axis {
+  font: 10px sans-serif;
+  position: fixed;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.axis text {
+  -webkit-transition: fill-opacity 250ms linear;
+}
+
+.axis path {
+  display: none;
+}
+
+.axis line {
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.axis.top {
+  background-image: linear-gradient(top, #fff 0%, rgba(255,255,255,0) 100%);
+  background-image: -o-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 100%);
+  background-image: -moz-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 100%);
+  background-image: -webkit-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 100%);
+  background-image: -ms-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 100%);
+  top: 0px;
+  padding: 0 0 24px 0;
+}
+
+.axis.bottom {
+  background-image: linear-gradient(bottom, #fff 0%, rgba(255,255,255,0) 100%);
+  background-image: -o-linear-gradient(bottom, #fff 0%, rgba(255,255,255,0) 100%);
+  background-image: -moz-linear-gradient(bottom, #fff 0%, rgba(255,255,255,0) 100%);
+  background-image: -webkit-linear-gradient(bottom, #fff 0%, rgba(255,255,255,0) 100%);
+  background-image: -ms-linear-gradient(bottom, #fff 0%, rgba(255,255,255,0) 100%);
+  bottom: 0px;
+  padding: 24px 0 0 0;
+}
+
+.horizon {
+  border-bottom: solid 1px #000;
+  overflow: hidden;
+  position: relative;
+}
+
+.horizon {
+  border-top: solid 1px #000;
+  border-bottom: solid 1px #000;
+}
+
+.horizon + .horizon {
+  border-top: none;
+}
+
+.horizon canvas {
+  display: block;
+}
+
+.horizon .title,
+.horizon .value {
+  bottom: 0;
+  line-height: 30px;
+  margin: 0 6px;
+  position: absolute;
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+  white-space: nowrap;
+}
+
+.horizon .title {
+  left: 0;
+}
+
+.horizon .value {
+  right: 0;
+}
+
+.line {
+  background: #000;
+  z-index: 2;
+}
+
+</style>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://square.github.com/cubism/cubism.v1.js?1.0.0"></script>
+<body id="demo">
+<script>
+
+var context = cubism.context()
+    .serverDelay(Date.now() - new Date(1390517531941))
+    .step(10)
+    .size(1280)
+    .stop();
+
+d3.select("#demo").selectAll(".axis")
+    .data(["top", "bottom"])
+  .enter().append("div")
+    .attr("class", function(d) { return d + " axis"; })
+    .each(function(d) { d3.select(this).call(context.axis().ticks(12).orient(d)); });
+
+d3.select("body").append("div")
+    .attr("class", "rule")
+    .call(context.rule());
+
+d3.select("body").selectAll(".horizon")
+    .data(["light", "accel", "yaccel"].map(stock))
+  .enter().insert("div", ".bottom")
+    .attr("class", "horizon")
+  .call(context.horizon()
+    .format(d3.format("+,.2g")));
+
+
+context.on("focus", function(i) {
+  d3.selectAll(".value").style("right", i == null ? null : context.size() - i + "px");
+});
+
+// Replace this with context.graphite and graphite.metric!
+function getLight(value) {
+  values = value.split(" ");
+  if(values.length < 3) return false;
+  if(values[1] != 5) return false;
+  if(values[2][0] != "[") return false;
+  return true;
+}
+
+function getAccel(value) {
+  values = value.split(" ");
+  if(values.length < 3) return false;
+  if(values[1] != 1) return false;
+  if(values[2][0] != "[") return false;
+  return true;
+}
+
+function stock(name) {
+  console.log(name);
+  var format = d3.time.format("%d-%b-%y");
+  return context.metric(function(start, stop, step, callback) {
+    console.log(start.getTime())
+    d3.text("2014-01-23_14-51-59.txt", "text/plain", function(error, data) {
+      rows = data.split("\n"); 
+      console.log(name);
+      if(name == "light") rows = rows.filter(getLight);
+      else if(name == "accel" || name=="yaccel") {
+        rows = rows.filter(getAccel);
+        //console.log(rows);
+      }
+
+      var date = start.getTime(); //parseFloat(rows[0].split(" ")[0]);
+      var value = 0; 
+      console.log(rows[0]);
+      var values = [value];
+      rows.forEach(function(d) {
+        //console.log(d.split(" ")[0]);
+        if(date > parseInt(d.split(" ")[0])) return;
+        while( (date = date + step) < parseInt(d.split(" ")[0])) {
+          //console.log(parseInt(d.split(" ")[0]));
+          //console.log(date);
+          //console.log(value);
+          if(name=="yaccel")
+          console.log(value);
+          values.push(value);
+        }
+        //console.log(date + " " + d.split(" ")[0]);
+        if(name == "yaccel") {
+          value = d.split(" ")[3].split(",")[0];
+          console.log(value)
+        }
+        value = d.split(" ")[2].substr(1).split(",")[0];
+      });
+      callback(null, values);
+    });
+  }, name);
+}
+
+</script>
+

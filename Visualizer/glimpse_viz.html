@@ -1,0 +1,224 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+	    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=10" />
+		<title>Log Chart</title>        
+        
+      <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+	  <script src="http://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.9/require.min.js"></script> 	
+	  <script src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.3.3/d3.min.js"></script>
+	  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+      <script type="text/javascript"
+            src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCTuHWbj2rNcuv7a8E4mkAocK8x_qopoVc&amp;sensor=false&amp;language=en-us">
+                </script> 
+        
+	    <style>
+		    body { font: 12px Arial;}
+
+		    path { 
+		        stroke: steelblue;
+		        stroke-width: 2;
+		        fill: none;
+		    }            
+
+            #map-canvas { width:400px; height: 200px; float:left; }
+            
+		    .axis path,
+		    .axis line {
+		        fill: none;
+		        stroke: grey;
+		        stroke-width: 1;
+		        shape-rendering: crispEdges;
+		    }
+
+		    .brush .extent {
+		        stroke: #fff;
+		        fill-opacity: .125;
+		        shape-rendering: crispEdges;
+		    }		    
+			.loader {
+	            position: absolute;
+	            top: 0;
+	            bottom: 0;
+	            left: 0;
+	            right: 0;
+	            background: rgba(255,255,255,0.8);
+	            text-align: center;
+	            z-index: 99;
+	            display: none;
+	        }
+            .loader p {
+                margin-top: 180px;
+            }
+		</style>
+
+		<script type="text/javascript">
+			'use strict';
+function getLight(value) {
+  var values = value.split(" ");
+  if(values.length < 3) return false;
+  if(values[1] != 5) return false;
+  if(values[2][0] != "[") return false;
+  return true;
+}
+
+function getAccel(value) {
+  var values = value.split(" ");
+  if(values.length < 3) return false;
+  if(values[1] != 1) return false;
+  if(values[2][0] != "[") return false;
+  return true;
+}
+
+function getParameterByName(name) {
+    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+    results = regex.exec(location.search);
+    return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+}
+function initialize() {
+        var mapOptions = {
+            center: new google.maps.LatLng(47.6527304, -122.3046784),
+            zoom: 17 
+        };
+        console.log("map init");
+        var map = new google.maps.Map(document.getElementById("map-canvas"),
+                        mapOptions);
+        return map;
+}
+//google.maps.event.addDomListener(window, 'load', initialize);
+
+		
+		    $(function () {
+
+		        requirejs.config({
+		            "baseUrl": "./",
+		            "paths": {
+		                "app": "./",
+		                'moment': 'http://cdnjs.cloudflare.com/ajax/libs/moment.js/2.2.1/moment.min',
+		                'underscore': 'http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.5.2/underscore-min'		                
+		            }
+		        });
+                var data_source;
+                var source_filename = getParameterByName("data");
+                if(source_filename != null && source_filename.length > 0)
+                {
+                    source_filename = source_filename + ".json";
+                }
+                else
+                {
+                    source_filename = "example.json";
+                }
+                var map = initialize();
+                console.log(map);
+                $.getJSON(source_filename, function(response) { data_source = response; 
+                console.log(data_source);
+		        var light1 = []; 
+		        var accelx = [];
+		        var accely = [];
+		        var accelz = [];
+                var locs = [];
+                var pics = [];
+                var hid = [];
+                d3.text(data_source.dir+"/loc.txt", "text/plain", function(error,data) {
+		        	var rows = data.split("\n");
+                    rows.forEach(function (d) {
+                        var sp = d.split(" ");
+                        //if(sp[1] == "gps")
+                        locs.push({"ts": parseInt(sp[0]), "lat": parseFloat(sp[3]), "lng": parseFloat(sp[4])});
+                    });
+                });
+                d3.text(data_source.dir+"/pic_list.txt", "text/plain", function(error, data) {
+                    data.split("\n").forEach(function (d) {
+                        pics.push(parseInt(d));
+                    });
+                });
+
+                d3.text(data_source.dir+"/hid.txt", "text/plain", function(error,data) {
+                    var rows = data.split("\n");
+                    rows.forEach(function(d) {
+                        var vals = d.split(" ").map(function(v) {return parseFloat(v);});
+                        if(vals[2] > 100) return;
+                        hid.push(vals);
+                    });
+                    console.log(hid);
+                });
+                var audio = [];
+                if(data_source.media_start)
+                {
+                    d3.text(data_source.dir+"/audio.txt", "text/plain", function(error,data) {
+                        var rows = data.split("\n");
+                        var cnt = 0
+                        rows.forEach(function(d) {
+                            if(cnt % 10 == 0)
+                            audio.push({"DateTime":data_source.media_start + cnt * (1000/8000), "Value":parseFloat(d)});
+                            cnt += 1;
+                        });
+                    });
+                }
+
+		        d3.text(data_source.dir+"/sensor.txt", "text/plain", function(error, data) {
+		        	var rows = data.split("\n");
+		        	var light_rows = rows.filter(getLight);
+		        	light_rows.forEach(function(d) { 
+		        		var sp = d.split(" ")
+		        		var date = parseInt(sp[0]);
+        				var value = parseFloat(sp[2].substr(1).split(",")[0]);
+        				light1.push({"DateTime":date, "Value":value});
+		        	});
+		        	var accel_rows = rows.filter(getAccel);
+		        	accel_rows.forEach(function(d) { 
+		        		var sp = d.split(" ")
+		        		var date = parseInt(sp[0]);
+        				var value = parseFloat(sp[2].substr(1).split(",")[0]);
+        				accelx.push({"DateTime":date, "Value":value});
+        				value = parseFloat(sp[3].split(",")[0]);
+        				accely.push({"DateTime":date, "Value":value});
+        				value = parseFloat(sp[4].split(",")[0].split("]")[0]);
+        				accelz.push({"DateTime":date, "Value":value});
+		        	});
+		        });
+		        //console.log(light1);
+
+		        setTimeout(function() { 
+		        require(['app/d3.chart'], function (d3Chart) {
+		            d3Chart.init({ container: '#container', xDim: 'DateTime', images:data_source.dir+"/pic/", start:data_source.start, locs:locs, map:map, pics:pics, hid:hid });
+                    if(audio.length >0 )
+                    {
+                    d3Chart.addGraph({ id: 'audio', type: 'analog', name: 'Audio', dataId: 512, yVal: ['Value'], data: audio });
+                    }
+		            d3Chart.addGraph({ id: 'light', type: 'analog', name: 'Light', dataId: 513, yVal: ['Value'], data: light1 });
+		            d3Chart.addGraph({ id: 'accel-x', type: 'analog', name: 'Accel-X', dataId: 514, yVal: ['Value'], data: accelx });
+		            d3Chart.addGraph({ id: 'accel-y', type: 'analog', name: 'Accel-Y', dataId: 515, yVal: ['Value'], data: accely });
+		            d3Chart.addGraph({ id: 'accel-z', type: 'analog', name: 'Accel-Z', dataId: 516, yVal: ['Value'], data: accelz });
+					d3Chart.render();		            		           
+
+		            /*setTimeout(function () {	
+		                d3Chart.reorderGraph('Accel', 'up');
+		                
+		                //window.setTimeout(function () {
+		                //    d3Chart.removeGraph('RPM');
+		                //}, 2000);
+		                
+		            }, 3000);*/
+
+
+		        });}, 3000);
+		    }); });
+
+		</script>
+	</head>
+	<body>
+		<div id="images" style="min-width:300px; width:300px; float:left;">
+			<img id="pic" width="300px" />
+		</div>    
+        <div id="hid" style="float:left;">
+        </div>
+        <div id="map-canvas"></div>
+	    <div id="container" style="min-width: 300px;width:100%">
+			<div class="loader"><p>Working...</p></div>
+		</div>
+        
+	</body>
+</html>
