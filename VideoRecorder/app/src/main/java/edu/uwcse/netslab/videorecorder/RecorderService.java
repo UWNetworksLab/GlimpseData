@@ -63,7 +63,7 @@ public class RecorderService extends Service implements SurfaceHolder.Callback {
     }
   
     private final IBinder mBinder = new LocalBinder();
-	private static final String PATH = Environment.getExternalStorageDirectory().toString() + "/monocleV";
+	private static final String PATH = Environment.getExternalStorageDirectory().toString() + "/glimpse";
     private HIDReader hid = new HIDReader();
     private LocationWriter lw;
     private SensorCollector sc;
@@ -127,6 +127,11 @@ public class RecorderService extends Service implements SurfaceHolder.Callback {
     {
         if(startDate == null) {
             startDate = new Date();
+        }
+
+        if(MainActivity.main != null)
+        {
+            MainActivity.main.update(startDate);
         }
 
         mCamera = Camera.open();

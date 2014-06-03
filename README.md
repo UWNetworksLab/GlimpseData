@@ -7,12 +7,12 @@ Data collection and visualization framework
 This is a visualizer for data collected through GlimpseData. 
 
 ## Data Preparation
-Collected data is stored /sdcard/monocleV/[DATE]
+Collected data is stored /sdcard/glimpse/[DATE]
 
 So, create a directory and copy data from the sdcard.
 
 	mkdir MYDATA
-	adb pull /sdcard/monocleV/[DATE]
+	adb pull /sdcard/glimpse/[DATE]
 
 First you need to convert data. in the MYDATA directory, run get_pic_list.py to get list of photos.
 
