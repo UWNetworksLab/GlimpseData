@@ -9,6 +9,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 import android.app.Notification;
 import android.app.Service;
@@ -64,10 +65,6 @@ public class RecorderService extends Service implements SurfaceHolder.Callback {
   
     private final IBinder mBinder = new LocalBinder();
 	private static final String PATH = Environment.getExternalStorageDirectory().toString() + "/glimpse";
-    private HIDReader hid = new HIDReader();
-    private LocationWriter lw;
-    private SensorCollector sc;
-    private WifiScanner ws;
 
     @Override
     public void onCreate() {
@@ -97,10 +94,6 @@ public class RecorderService extends Service implements SurfaceHolder.Callback {
         layoutParams.gravity = Gravity.LEFT | Gravity.TOP;
         windowManager.addView(surfaceView, layoutParams);
         surfaceView.getHolder().addCallback(this);
-
-        lw = new LocationWriter((LocationManager) getSystemService(Context.LOCATION_SERVICE));
-        ws = new WifiScanner((WifiManager) getSystemService(Context.WIFI_SERVICE));
-        sc = new SensorCollector((SensorManager) getSystemService(Context.SENSOR_SERVICE));
     }
 
     @Override
@@ -121,7 +114,6 @@ public class RecorderService extends Service implements SurfaceHolder.Callback {
     private static final int SECOND = 1000;
     private static final int MINUTE = 60*SECOND;
     private static final int max_duration = 20*MINUTE;
-    private RehearsalAudioRecorder audioRecorder;
 
     private void startRecorder(Date startDate)
     {
@@ -137,17 +129,18 @@ public class RecorderService extends Service implements SurfaceHolder.Callback {
         mCamera = Camera.open();
 
         Camera.Parameters parameters = mCamera.getParameters();
-        for(Camera.Size s: parameters.getSupportedPreviewSizes())
+        /*for(Camera.Size s: parameters.getSupportedPreviewSizes())
         {
             Log.i(TAG, ""+s.width +" " +s.height);
+        }*/
+        List<int[]> fpsRange = parameters.getSupportedPreviewFpsRange();
+        for(int[] fps: fpsRange) {
+            Log.i(TAG, ""+fps[0] +" " + fps[1]);
         }
 
         final String pathWithDate =  PATH + "/" + DateFormat.format("yyyy-MM-dd_kk-mm-ss", startDate.getTime());
         File dir_pic = new File(pathWithDate+"/pic");
         dir_pic.mkdir();
-        audioRecorder = new RehearsalAudioRecorder(false, MediaRecorder.AudioSource.MIC, 16000, AudioFormat.CHANNEL_CONFIGURATION_STEREO, AudioFormat.ENCODING_PCM_16BIT);
-        audioRecorder.setOutputFile(pathWithDate+"/audio.3gp");
-        audioRecorder.prepare();
         if(writer != null)
         {
             try {
@@ -161,9 +154,8 @@ public class RecorderService extends Service implements SurfaceHolder.Callback {
             }
 
         }
-        audioRecorder.start();
 
-        parameters.setPreviewFpsRange(30000, 30000);
+        parameters.setPreviewFpsRange(24000, 30000);
         parameters.setPreviewSize(640, 480);
         parameters.setRotation(90);
         mCamera.setParameters(parameters);
@@ -233,17 +225,7 @@ public class RecorderService extends Service implements SurfaceHolder.Callback {
         }
 
         this.surfaceHolder = surfaceHolder;
-
-
-        if(useHID) hid.start(pathWithDate+"/hid.txt");
-        lw.start(pathWithDate+"/loc.txt");
-        ws.Start(pathWithDate + "/wifi.txt", this);
-
-
-
-
         startRecorder(startDate);
-        sc.RegisterSensors(writer);
 	}
 
     private void stopRecorder()
@@ -269,12 +251,6 @@ public class RecorderService extends Service implements SurfaceHolder.Callback {
     public void onDestroy() {
         Log.i(TAG, "on destroy");
         stopRecorder();
-        sc.UnregisterSensors();
-        if(useHID) hid.stop();
-        lw.stop();
-        ws.Stop();
-        audioRecorder.stop();
-        audioRecorder.release();
         windowManager.removeView(surfaceView);
         Log.i(TAG, "Service Destroyed");
         
